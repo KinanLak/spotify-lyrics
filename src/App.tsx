@@ -300,6 +300,15 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") void closeStageMode();
+    }
+
+    if (stageMode) document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [stageMode]);
+
+  useEffect(() => {
     if (source !== "spotify" || !token) return;
 
     let cancelled = false;
@@ -520,7 +529,7 @@ export default function App() {
             <h1>LyricWave</h1>
           </div>
           <div className="topbar-actions">
-            <button className="stage-button" onClick={() => setStageMode(true)}>Mode scene</button>
+            <button className="stage-button" onClick={() => setStageMode(true)}>Mode scène</button>
             <div className="source-tabs" aria-label="Sources audio">
               <button className={source === "demo" ? "active" : ""} onClick={() => setSource("demo")}>Demo</button>
               <button className={source === "local" ? "active" : ""} onClick={() => setSource("local")}>Local</button>
@@ -563,7 +572,7 @@ export default function App() {
               <button className="primary-control" onClick={togglePlayback} disabled={source === "spotify"}>
                 {isPlaying ? "Pause" : "Play"}
               </button>
-              <button onClick={() => setStageMode(true)}>Plein ecran lyrics</button>
+              <button onClick={() => setStageMode(true)}>Plein écran lyrics</button>
               {token ? <button onClick={disconnectSpotify}>Deconnecter</button> : <button onClick={connectSpotify}>Connecter Spotify</button>}
             </div>
 
