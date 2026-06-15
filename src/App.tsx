@@ -546,7 +546,7 @@ export default function App() {
             </div>
 
             <div className="track-copy">
-              <p className="status-pill">{source === "spotify" ? spotifyStatus : source === "local" ? "Mode local" : "Mode demo"}</p>
+              <p className="status-line">{source === "spotify" ? spotifyStatus : source === "local" ? "Mode local" : "Mode demo"}</p>
               <h2>{trackTitle}</h2>
               <p>{trackArtist}</p>
             </div>

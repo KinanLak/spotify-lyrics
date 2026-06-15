@@ -126,7 +126,7 @@ h1 {
   gap: 6px;
   padding: 5px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.07);
 }
 
@@ -136,7 +136,7 @@ h1 {
 .stage-button,
 .ghost-button {
   color: #fff;
-  border-radius: 999px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.1);
   transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease;
 }
@@ -150,8 +150,8 @@ h1 {
 .primary-control,
 .file-button,
 .stage-button {
-  background: linear-gradient(135deg, #8f62ff, #f455b6 54%, #1ed760);
-  box-shadow: 0 14px 30px rgba(143, 98, 255, 0.24);
+  background: linear-gradient(135deg, #8f62ff, #f455b6 62%);
+  box-shadow: 0 12px 26px rgba(143, 98, 255, 0.2);
 }
 
 .source-tabs button:hover,
@@ -164,7 +164,7 @@ h1 {
 
 .stage-grid {
   display: grid;
-  grid-template-columns: minmax(310px, 380px) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
   gap: 16px;
   height: clamp(560px, calc(100vh - 205px), 720px);
   min-height: 0;
@@ -180,8 +180,8 @@ h1 {
 
 .player-panel {
   display: grid;
-  grid-template-rows: auto auto auto 1fr auto;
-  gap: 18px;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 16px;
   overflow: hidden;
   padding: 18px;
 }
@@ -189,10 +189,10 @@ h1 {
 .cover-wrap {
   position: relative;
   overflow: hidden;
-  width: min(100%, 320px);
+  width: min(100%, 250px);
   aspect-ratio: 1;
   justify-self: center;
-  border-radius: 24px;
+  border-radius: 20px;
   background: linear-gradient(145deg, #281c54, #151120);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 18px 55px rgba(0, 0, 0, 0.3);
 }
@@ -244,12 +244,15 @@ h1 {
 }
 
 .track-copy h2 {
+  display: -webkit-box;
   overflow: hidden;
   margin: 0 0 8px;
   font-size: clamp(1.65rem, 3vw, 2.25rem);
   line-height: 1;
   letter-spacing: -0.06em;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .track-copy p:last-child,
@@ -258,18 +261,19 @@ h1 {
   color: #cfc6db;
 }
 
-.status-pill {
-  display: inline-flex;
+.status-line {
+  display: block;
   max-width: 100%;
-  margin-bottom: 12px;
-  padding: 7px 11px;
+  margin-bottom: 10px;
+  padding: 0;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 999px;
-  color: #d9d1ff;
-  background: rgba(255, 255, 255, 0.08);
-  font-size: 0.82rem;
+  color: #bba8ff;
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
   text-overflow: ellipsis;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -277,15 +281,15 @@ h1 {
   position: relative;
   overflow: hidden;
   align-self: end;
-  border-radius: 18px;
-  padding: 15px;
-  background: rgba(255, 255, 255, 0.08);
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
 }
 
 .time-row {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   color: #ddd6eb;
   font-size: 0.86rem;
 }
@@ -304,7 +308,7 @@ input[type="range"]:disabled {
 .progress-glow {
   position: absolute;
   inset: auto auto 0 0;
-  height: 3px;
+  height: 2px;
   border-radius: 999px;
   background: linear-gradient(90deg, #8f62ff, #f455b6, #1ed760);
   box-shadow: 0 0 24px rgba(244, 85, 182, 0.78);
@@ -313,11 +317,13 @@ input[type="range"]:disabled {
 .controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
 
 .controls button {
-  padding: 12px 15px;
+  padding: 11px 13px;
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .controls button:disabled {
@@ -450,6 +456,7 @@ input[type="range"]:disabled {
   margin: 8px 8px 0 0;
   padding: 10px 13px;
   font-weight: 750;
+  border-radius: 14px;
 }
 
 .file-button.secondary {
