@@ -1,6 +1,4 @@
-import { ChangeEvent, useEffect, useRef, useState } from "react";
-
-type Source = "demo" | "local" | "spotify";
+import { useEffect, useRef, useState } from "react";
 
 type LyricLine = {
   time: number;
@@ -35,23 +33,6 @@ const SPOTIFY_SCOPES = "user-read-currently-playing user-read-playback-state";
 const TOKEN_KEY = "lyricwave.spotify.token";
 const VERIFIER_KEY = "lyricwave.spotify.verifier";
 const STATE_KEY = "lyricwave.spotify.state";
-
-const DEMO_DURATION = 116;
-const DEMO_LRC = `[00:00.00]Branche une musique, et les mots prennent vie
-[00:07.50]Le tempo trace une ligne dans la nuit
-[00:14.20]Chaque phrase remonte au centre de l'ecran
-[00:21.30]Comme un karaoké doux, précis, vibrant
-[00:29.40]Quand Spotify joue, on suit le morceau
-[00:36.20]LRCLIB trouve les paroles au bon tempo
-[00:43.40]Si tu preferes, depose ton audio ici
-[00:51.20]Ajoute un fichier LRC, tout se synchronise
-[00:59.00]La voix avance, la couleur respire
-[01:06.50]Les lignes passent, impossible de les perdre
-[01:14.00]Un lecteur sobre, vivant, fait pour chanter
-[01:22.00]Et garder les lyrics calés sur la musique
-[01:31.00]Relance, cherche, importe, teste en direct
-[01:39.00]LyricWave garde le fil de chaque seconde
-[01:47.00]Fin du couplet, la scène reste allumée`;
 
 function parseLrc(lrc: string): LyricLine[] {
   return lrc
@@ -90,6 +71,16 @@ function formatTime(seconds: number) {
   const minutes = Math.floor(safeSeconds / 60);
   const rest = Math.floor(safeSeconds % 60).toString().padStart(2, "0");
   return `${minutes}:${rest}`;
+}
+
+// Adaptive font size for the active karaoke line: shorter lines get bigger,
+// long lines shrink so they never wrap to three lines.
+function karaokeLineSize(length: number) {
+  if (length <= 16) return "clamp(2.8rem, 7vw, 7rem)";
+  if (length <= 26) return "clamp(2.4rem, 5.6vw, 5.6rem)";
+  if (length <= 38) return "clamp(2rem, 4.6vw, 4.6rem)";
+  if (length <= 52) return "clamp(1.7rem, 3.6vw, 3.8rem)";
+  return "clamp(1.5rem, 3vw, 3.2rem)";
 }
 
 function loadToken(): SpotifyToken | null {
@@ -195,41 +186,29 @@ async function fetchSyncedLyrics(track: SpotifyTrack) {
 }
 
 export default function App() {
-  const [source, setSource] = useState<Source>("demo");
-  const [demoPlaying, setDemoPlaying] = useState(false);
-  const [demoTime, setDemoTime] = useState(0);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [localTime, setLocalTime] = useState(0);
-  const [localDuration, setLocalDuration] = useState(0);
-  const [localPlaying, setLocalPlaying] = useState(false);
-  const [manualLrc, setManualLrc] = useState("");
   const [token, setToken] = useState<SpotifyToken | null>(() => loadToken());
   const [spotifySnapshot, setSpotifySnapshot] = useState<SpotifySnapshot | null>(null);
   const [spotifyLyrics, setSpotifyLyrics] = useState<LyricLine[]>([]);
-  const [spotifyStatus, setSpotifyStatus] = useState("Spotify non connecte");
-  const [lyricsStatus, setLyricsStatus] = useState("Mode demo pret");
+  const [spotifyStatus, setSpotifyStatus] = useState("Spotify non connecté");
+  const [lyricsStatus, setLyricsStatus] = useState("");
+  const [toast, setToast] = useState("");
   const [stageMode, setStageMode] = useState(false);
   const [now, setNow] = useState(Date.now());
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const activeLineRef = useRef<HTMLLIElement | null>(null);
+  const activeLineRef = useRef<HTMLParagraphElement | null>(null);
+  const stageLineRef = useRef<HTMLParagraphElement | null>(null);
   const stageModeRef = useRef<HTMLElement | null>(null);
 
-  const displayLyrics = source === "spotify" ? spotifyLyrics : source === "local" ? parseLrc(manualLrc) : parseLrc(DEMO_LRC);
-  const spotifySeconds = spotifySnapshot
+  const displayLyrics = spotifyLyrics;
+  const currentSeconds = spotifySnapshot
     ? Math.min(
         spotifySnapshot.track.durationMs / 1000,
         (spotifySnapshot.progressMs + (spotifySnapshot.isPlaying ? now - spotifySnapshot.sampledAt : 0)) / 1000,
       )
     : 0;
-  const currentSeconds = source === "spotify" ? spotifySeconds : source === "local" ? localTime : demoTime;
-  const durationSeconds = source === "spotify" ? (spotifySnapshot?.track.durationMs ?? 0) / 1000 : source === "local" ? localDuration : DEMO_DURATION;
+  const durationSeconds = (spotifySnapshot?.track.durationMs ?? 0) / 1000;
   const activeIndex = getActiveIndex(displayLyrics, currentSeconds);
-  const activeLine = displayLyrics[activeIndex];
-  const previousLine = activeIndex > 0 ? displayLyrics[activeIndex - 1] : undefined;
-  const nextLine = activeIndex >= 0 ? displayLyrics[activeIndex + 1] : displayLyrics[0];
   const progress = durationSeconds > 0 ? Math.min(100, (currentSeconds / durationSeconds) * 100) : 0;
-  const isPlaying = source === "spotify" ? Boolean(spotifySnapshot?.isPlaying) : source === "local" ? localPlaying : demoPlaying;
-  const visibleLyricsStatus = source === "spotify" ? lyricsStatus : source === "local" ? (displayLyrics.length > 0 ? `${displayLyrics.length} lignes LRC importees` : "Importe ou colle un LRC") : "Lyrics de demonstration";
+  const isPlaying = Boolean(spotifySnapshot?.isPlaying);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -249,8 +228,7 @@ export default function App() {
       .then((newToken) => {
         saveToken(newToken);
         setToken(newToken);
-        setSource("spotify");
-        setSpotifyStatus("Spotify connecte. Lance un titre dans Spotify.");
+        setSpotifyStatus("Spotify connecté. Lance un titre dans Spotify.");
       })
       .catch((error: Error) => setSpotifyStatus(error.message))
       .finally(() => {
@@ -260,30 +238,24 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (source !== "demo" || !demoPlaying) return;
-
-    const timer = window.setInterval(() => {
-      setDemoTime((time) => (time >= DEMO_DURATION ? 0 : time + 0.25));
-    }, 250);
-
-    return () => window.clearInterval(timer);
-  }, [demoPlaying, source]);
-
-  useEffect(() => {
-    if (source !== "spotify") return;
-
     const timer = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(timer);
-  }, [source]);
-
-  useEffect(() => {
-    if (!audioUrl) return;
-    return () => URL.revokeObjectURL(audioUrl);
-  }, [audioUrl]);
+  }, []);
 
   useEffect(() => {
     activeLineRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [activeIndex]);
+
+  useEffect(() => {
+    if (!stageMode) return;
+    stageLineRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [activeIndex, stageMode]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(""), 2800);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   useEffect(() => {
     if (!stageMode) return;
@@ -309,7 +281,7 @@ export default function App() {
   }, [stageMode]);
 
   useEffect(() => {
-    if (source !== "spotify" || !token) return;
+    if (!token) return;
 
     let cancelled = false;
     const currentToken = token;
@@ -380,20 +352,21 @@ export default function App() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [source, token]);
+  }, [token]);
 
   useEffect(() => {
-    if (source !== "spotify" || !spotifySnapshot) return;
+    if (!spotifySnapshot) return;
 
     let cancelled = false;
-    setLyricsStatus("Recherche des paroles synchronisees...");
+    setLyricsStatus("Recherche des paroles synchronisées…");
     setSpotifyLyrics([]);
 
     fetchSyncedLyrics(spotifySnapshot.track)
       .then((lines) => {
         if (cancelled) return;
         setSpotifyLyrics(lines);
-        setLyricsStatus(`${lines.length} lignes synchronisees avec LRCLIB`);
+        setLyricsStatus("");
+        setToast("Paroles synchronisées trouvées");
       })
       .catch((error: Error) => {
         if (cancelled) return;
@@ -404,7 +377,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [source, spotifySnapshot?.track.id]);
+  }, [spotifySnapshot?.track.id]);
 
   async function connectSpotify() {
     if (!SPOTIFY_CLIENT_ID) {
@@ -436,42 +409,7 @@ export default function App() {
     setToken(null);
     setSpotifySnapshot(null);
     setSpotifyLyrics([]);
-    setSpotifyStatus("Spotify deconnecte");
-    setSource("demo");
-  }
-
-  function handleAudioFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setAudioUrl(URL.createObjectURL(file));
-    setLocalTime(0);
-    setLocalDuration(0);
-    setSource("local");
-  }
-
-  async function handleLrcFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setManualLrc(await file.text());
-    setSource("local");
-  }
-
-  function togglePlayback() {
-    if (source === "demo") {
-      setDemoPlaying((playing) => !playing);
-      return;
-    }
-
-    if (source === "local" && audioRef.current) {
-      if (audioRef.current.paused) void audioRef.current.play();
-      else audioRef.current.pause();
-    }
-  }
-
-  function seek(seconds: number) {
-    if (source === "demo") setDemoTime(seconds);
-    if (source === "local" && audioRef.current) audioRef.current.currentTime = seconds;
+    setSpotifyStatus("Spotify déconnecté");
   }
 
   async function closeStageMode() {
@@ -479,171 +417,147 @@ export default function App() {
     setStageMode(false);
   }
 
-  const trackTitle = source === "spotify" ? spotifySnapshot?.track.title ?? "En attente de Spotify" : source === "local" ? "Ton morceau local" : "Demo LyricWave";
-  const trackArtist = source === "spotify" ? spotifySnapshot?.track.artist ?? "Lance un titre dans Spotify" : source === "local" ? "Audio + fichier LRC" : "Synchronisation simulee";
+  const trackTitle = spotifySnapshot?.track.title ?? "En attente de Spotify";
+  const trackArtist = spotifySnapshot?.track.artist ?? (token ? "Lance un titre dans Spotify" : "Connecte ton compte pour démarrer");
   const cover = spotifySnapshot?.track.cover;
+
+  const coverArt = cover ? (
+    <img src={cover} alt="Pochette de l'album" />
+  ) : (
+    <span className="cover-mark">♪</span>
+  );
 
   return (
     <>
       {stageMode && (
-        <section className="stage-mode" ref={stageModeRef}>
-          <div className="stage-orb stage-orb-one" />
-          <div className="stage-orb stage-orb-two" />
+        <section className="stage" ref={stageModeRef}>
+          {cover ? (
+            <div className="stage-backdrop" style={{ backgroundImage: `url(${cover})` }} />
+          ) : (
+            <div className="stage-glow" />
+          )}
+          <div className="stage-scrim" />
 
-          <header className="stage-topline">
+          <header className="stage-head">
             <div className="stage-track">
-              <div className="stage-cover">
-                {cover ? <img src={cover} alt="Pochette de l'album" /> : <span>LW</span>}
-              </div>
-              <div>
-                <p>{isPlaying ? "Lecture en cours" : "En pause"}</p>
-                <h1>{trackTitle}</h1>
-                <span>{trackArtist}</span>
+              <div className="stage-cover">{coverArt}</div>
+              <div className="stage-track-text">
+                <span className="stage-track-name">{trackTitle}</span>
+                <span className="stage-track-artist">
+                  <span className={isPlaying ? "live-dot on" : "live-dot"} />
+                  {trackArtist}
+                </span>
               </div>
             </div>
-            <button className="ghost-button" onClick={closeStageMode}>Quitter</button>
+            <button className="btn ghost" onClick={closeStageMode}>Quitter ✕</button>
           </header>
 
-          <div className="stage-lyrics-wrap" aria-live="polite">
-            <p className="stage-side-line">{previousLine?.text ?? " "}</p>
-            <h2>{activeLine?.text ?? "En attente des paroles"}</h2>
-            <p className="stage-side-line next">{nextLine?.text ?? " "}</p>
-          </div>
+          {displayLyrics.length > 0 ? (
+            <div className="stage-scroll" aria-live="polite">
+              {displayLyrics.map((line, index) => {
+                const state = index === activeIndex ? "active" : index < activeIndex ? "past" : "future";
+                return (
+                  <p
+                    key={`${line.time}-${line.text}`}
+                    ref={index === activeIndex ? stageLineRef : null}
+                    className={`stage-line ${state}`}
+                    style={index === activeIndex ? { fontSize: karaokeLineSize(line.text.length) } : undefined}
+                  >
+                    {line.text}
+                  </p>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="stage-empty"><p>En attente des paroles…</p></div>
+          )}
 
-          <footer className="stage-footer">
+          <footer className="stage-foot">
             <span>{formatTime(currentSeconds)}</span>
-            <div className="stage-progress" aria-hidden="true"><span style={{ width: `${progress}%` }} /></div>
+            <div className="bar"><span style={{ width: `${progress}%` }} /></div>
             <span>{formatTime(durationSeconds)}</span>
           </footer>
         </section>
       )}
 
-      <main className="app-shell">
-      <section className="hero-card">
-        <div className="aurora aurora-one" />
-        <div className="aurora aurora-two" />
-
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">Lyrics synchronises</p>
-            <h1>LyricWave</h1>
+      <div className="app">
+        <header className="topbar simple">
+          <div className="brand">
+            <span className="brand-mark">♪</span>
+            <span className="brand-name">LyricWave</span>
           </div>
+
           <div className="topbar-actions">
-            <button className="stage-button" onClick={() => setStageMode(true)}>Mode scène</button>
-            <div className="source-tabs" aria-label="Sources audio">
-              <button className={source === "demo" ? "active" : ""} onClick={() => setSource("demo")}>Demo</button>
-              <button className={source === "local" ? "active" : ""} onClick={() => setSource("local")}>Local</button>
-              <button className={source === "spotify" ? "active" : ""} onClick={() => setSource("spotify")}>Spotify</button>
-            </div>
+            {token ? (
+              <button className="btn ghost" onClick={disconnectSpotify}>Déconnecter</button>
+            ) : (
+              <button className="btn accent" onClick={connectSpotify}>Connecter Spotify</button>
+            )}
           </div>
         </header>
 
-        <section className="stage-grid">
-          <div className="player-panel glass-panel">
-            <div className="cover-wrap">
-              {cover ? <img src={cover} alt="Pochette de l'album" /> : <div className="cover-placeholder"><span>LW</span></div>}
-              <span className={isPlaying ? "pulse-dot playing" : "pulse-dot"} />
+        <main className="lyrics-view">
+          {toast && (
+            <div className="toast" role="status">
+              <span className="live-dot on" />
+              {toast}
             </div>
+          )}
 
-            <div className="track-copy">
-              <p className="status-line">{source === "spotify" ? spotifyStatus : source === "local" ? "Mode local" : "Mode demo"}</p>
-              <h2>{trackTitle}</h2>
-              <p>{trackArtist}</p>
+          {displayLyrics.length > 0 ? (
+            <div className="lyrics-scroll">
+              {displayLyrics.map((line, index) => {
+                const state = index === activeIndex ? "active" : index < activeIndex ? "past" : "future";
+                return (
+                  <p
+                    key={`${line.time}-${line.text}`}
+                    ref={index === activeIndex ? activeLineRef : null}
+                    className={`lyric-line ${state}`}
+                  >
+                    {line.text}
+                  </p>
+                );
+              })}
             </div>
-
-            <div className="progress-area">
-              <div className="time-row">
-                <span>{formatTime(currentSeconds)}</span>
-                <span>{formatTime(durationSeconds)}</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max={Math.max(1, durationSeconds)}
-                value={Math.min(currentSeconds, Math.max(1, durationSeconds))}
-                onChange={(event) => seek(Number(event.target.value))}
-                disabled={source === "spotify" || durationSeconds === 0}
-                aria-label="Position dans le morceau"
-              />
-              <div className="progress-glow" style={{ width: `${progress}%` }} />
-            </div>
-
-            <div className="controls">
-              <button className="primary-control" onClick={togglePlayback} disabled={source === "spotify"}>
-                {isPlaying ? "Pause" : "Play"}
-              </button>
-              <button onClick={() => setStageMode(true)}>Plein écran lyrics</button>
-              {token ? <button onClick={disconnectSpotify}>Deconnecter</button> : <button onClick={connectSpotify}>Connecter Spotify</button>}
-            </div>
-
-            <audio
-              ref={audioRef}
-              src={audioUrl ?? undefined}
-              onTimeUpdate={(event) => setLocalTime(event.currentTarget.currentTime)}
-              onLoadedMetadata={(event) => setLocalDuration(event.currentTarget.duration)}
-              onPlay={() => setLocalPlaying(true)}
-              onPause={() => setLocalPlaying(false)}
-              onEnded={() => { setLocalTime(0); setLocalPlaying(false); }}
-            />
-          </div>
-
-          <div className="lyrics-panel glass-panel">
-            <div className="lyrics-header">
-              <div>
-                <p className="eyebrow">Live lyrics</p>
-                <h2>{displayLyrics[activeIndex]?.text ?? "Pret a chanter"}</h2>
-              </div>
-              <span>{visibleLyricsStatus}</span>
-            </div>
-
-            <ol className="lyrics-list">
-              {displayLyrics.length > 0 ? displayLyrics.map((line, index) => (
-                <li
-                  key={`${line.time}-${line.text}`}
-                  ref={index === activeIndex ? activeLineRef : null}
-                  className={index === activeIndex ? "active" : index < activeIndex ? "past" : ""}
-                >
-                  <time>{formatTime(line.time)}</time>
-                  <span>{line.text}</span>
-                </li>
-              )) : (
-                <li className="empty-line">
-                  <time>0:00</time>
-                  <span>Importe un fichier .lrc ou lance un titre Spotify avec lyrics disponibles sur LRCLIB.</span>
-                </li>
+          ) : (
+            <div className="lyrics-empty">
+              <p className="empty-title">{token ? "Pas de paroles pour l'instant" : "Bienvenue sur LyricWave"}</p>
+              <p className="empty-sub">
+                {token
+                  ? lyricsStatus || spotifyStatus
+                  : "Connecte ton compte Spotify, lance un titre, et suis les paroles synchronisées en temps réel."}
+              </p>
+              {!token && (
+                <button className="btn accent" onClick={connectSpotify}>Connecter Spotify</button>
               )}
-            </ol>
-          </div>
-        </section>
-      </section>
+            </div>
+          )}
+        </main>
 
-      <section className="setup-grid">
-        <article className="setup-card">
-          <span>01</span>
-          <h3>Spotify live</h3>
-          <p>Connecte ton compte, lance un titre dans Spotify, puis LyricWave lit la position du morceau et recupere les paroles synchronisees via LRCLIB.</p>
-        </article>
-        <article className="setup-card">
-          <span>02</span>
-          <h3>Audio local</h3>
-          <p>Teste sans API avec ton propre fichier audio et un fichier LRC. La ligne active suit exactement la position du lecteur.</p>
-          <label className="file-button">
-            Importer audio
-            <input type="file" accept="audio/*" onChange={handleAudioFile} />
-          </label>
-          <label className="file-button secondary">
-            Importer LRC
-            <input type="file" accept=".lrc,text/plain" onChange={handleLrcFile} />
-          </label>
-        </article>
-        <article className="setup-card lrc-editor">
-          <span>03</span>
-          <h3>Coller des lyrics</h3>
-          <p>Format attendu: <code>[00:12.34]Une ligne synchronisee</code>.</p>
-          <textarea value={manualLrc} onChange={(event) => { setManualLrc(event.target.value); setSource("local"); }} placeholder="[00:00.00]Premiere ligne\n[00:08.40]Deuxieme ligne" />
-        </article>
-      </section>
-      </main>
+        <footer className="player">
+          <div className="player-track">
+            <div className="player-cover">{coverArt}</div>
+            <div className="player-info">
+              <span className="player-title">{trackTitle}</span>
+              <span className="player-artist">{trackArtist}</span>
+            </div>
+          </div>
+
+          <div className="player-center">
+            <div className="scrubber">
+              <span className="time">{formatTime(currentSeconds)}</span>
+              <div className="bar"><span style={{ width: `${progress}%` }} /></div>
+              <span className="time">{formatTime(durationSeconds)}</span>
+            </div>
+          </div>
+
+          <div className="player-actions">
+            <button className="btn ghost" onClick={() => setStageMode(true)} disabled={displayLyrics.length === 0}>
+              Karaoké
+            </button>
+          </div>
+        </footer>
+      </div>
     </>
   );
 }
